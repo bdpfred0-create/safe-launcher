@@ -1,6 +1,12 @@
 package com.safelauncher.app
 
+import android.app.role.RoleManager
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -37,11 +43,19 @@ class MainActivity : ComponentActivity() {
                     LockScreen(
                         viewModel = viewModel,
                         onUnlocked = {
-                            // Desbloqueado com sucesso (seja modo normal ou modo pânico)
+                            // Se não for o launcher padrão na primeira vez, sugere ao usuário
+                            if (!isDefaultLauncher()) {
+                                requestDefaultLauncher()
+                            }
                         }
                     )
                 } else {
-                    HomeScreen(viewModel = viewModel)
+                    HomeScreen(
+                        viewModel = viewModel,
+                        isDefaultLauncher = isDefaultLauncher(),
+                        onRequestDefaultLauncher = { requestDefaultLauncher() },
+                        onRequestAccessibility = { openAccessibilitySettings() }
+                    )
                 }
             }
         }
@@ -50,5 +64,40 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.loadApps()
+    }
+
+    /**
+     * Verifica se o Safe Launcher já é a tela inicial padrão do aparelho
+     */
+    fun isDefaultLauncher(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(RoleManager::class.java)
+            roleManager.isRoleHeld(RoleManager.ROLE_HOME)
+        } else {
+            val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            val resolveInfo = packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
+            resolveInfo?.activityInfo?.packageName == packageName
+        }
+    }
+
+    /**
+     * Dispara a caixa nativa do Android perguntando: "Definir como aplicativo de início?"
+     */
+    fun requestDefaultLauncher() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(RoleManager::class.java)
+            if (roleManager.isRoleAvailable(RoleManager.ROLE_HOME) && !roleManager.isRoleHeld(RoleManager.ROLE_HOME)) {
+                val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_HOME)
+                startActivity(intent)
+                return
+            }
+        }
+        val intent = Intent(Settings.ACTION_HOME_SETTINGS)
+        startActivity(intent)
+    }
+
+    fun openAccessibilitySettings() {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        startActivity(intent)
     }
 }
