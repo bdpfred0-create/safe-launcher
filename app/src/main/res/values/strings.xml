@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Safe Launcher</string>
+    <string name="accessibility_description">Proteção ativa do Safe Launcher para fechar imediatamente aplicativos bancários e sensíveis quando a Senha de Coação for acionada.</string>
 </resources>
