@@ -44,7 +44,12 @@ import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(viewModel: LauncherViewModel) {
+fun HomeScreen(
+    viewModel: LauncherViewModel,
+    isDefaultLauncher: Boolean = true,
+    onRequestDefaultLauncher: () -> Unit = {},
+    onRequestAccessibility: () -> Unit = {}
+) {
     val context = LocalContext.current
     val visibleApps = viewModel.getVisibleApps()
 
@@ -70,6 +75,39 @@ fun HomeScreen(viewModel: LauncherViewModel) {
                     .statusBarsPadding()
                     .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
+                // Se NÃO for a tela inicial padrão, exibe um alerta discreto para o usuário fixar
+                if (!isDefaultLauncher) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                            .clickable(onClick = onRequestDefaultLauncher),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0369A1))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Home, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Definir como Tela de Início Padrão",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = Color.White
+                                )
+                                Text(
+                                    text = "Toque aqui para impedir que o app minimize.",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFFE0F2FE)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Top Bar com Relógio e Botão de Configurações
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -91,7 +129,6 @@ fun HomeScreen(viewModel: LauncherViewModel) {
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // Botão para simular o bloqueio de tela
                         IconButton(
                             onClick = { viewModel.lockDevice() },
                             modifier = Modifier
@@ -105,7 +142,6 @@ fun HomeScreen(viewModel: LauncherViewModel) {
                             )
                         }
 
-                        // Botão discreto de configurações (exige PIN mestre)
                         IconButton(
                             onClick = { viewModel.promptOpenSettings() },
                             modifier = Modifier
@@ -121,7 +157,7 @@ fun HomeScreen(viewModel: LauncherViewModel) {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // BARRA DE PESQUISA
                 OutlinedTextField(
@@ -185,7 +221,9 @@ fun HomeScreen(viewModel: LauncherViewModel) {
     if (viewModel.isSettingsOpen) {
         SensitiveAppsSettingsSheet(
             viewModel = viewModel,
-            onDismiss = { viewModel.isSettingsOpen = false }
+            onDismiss = { viewModel.isSettingsOpen = false },
+            onRequestDefaultLauncher = onRequestDefaultLauncher,
+            onRequestAccessibility = onRequestAccessibility
         )
     }
 }
@@ -295,7 +333,9 @@ fun PinVerificationDialog(
 @Composable
 fun SensitiveAppsSettingsSheet(
     viewModel: LauncherViewModel,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onRequestDefaultLauncher: () -> Unit,
+    onRequestAccessibility: () -> Unit
 ) {
     val context = LocalContext.current
     var masterPinInput by remember { mutableStateOf(viewModel.masterPin) }
@@ -317,7 +357,7 @@ fun SensitiveAppsSettingsSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Configuração de Senha Dupla",
+                    text = "Configurações de Blindagem",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -327,15 +367,43 @@ fun SensitiveAppsSettingsSheet(
                 }
             }
 
-            Text(
-                text = "Cadastre duas senhas de desbloqueio para a sua proteção:",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Botões de Permissões Críticas do Sistema
+            Button(
+                onClick = onRequestDefaultLauncher,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0369A1))
+            ) {
+                Icon(Icons.Default.Home, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("1. Definir como Tela Inicial Padrão")
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            OutlinedButton(
+                onClick = onRequestAccessibility,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Security, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("2. Ativar Bloqueador Ativo de Bancos")
+            }
 
             Spacer(modifier = Modifier.height(14.dp))
+            Divider(color = MaterialTheme.colorScheme.surfaceVariant)
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Campo Senha Real
+            Text(
+                text = "Senhas de Desbloqueio:",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             OutlinedTextField(
                 value = masterPinInput,
                 onValueChange = { if (it.length <= 6) masterPinInput = it },
@@ -348,11 +416,10 @@ fun SensitiveAppsSettingsSheet(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Campo Senha de Coação
             OutlinedTextField(
                 value = duressPinInput,
                 onValueChange = { if (it.length <= 6) duressPinInput = it },
-                label = { Text("Senha de Coação (Desbloqueia e esconde bancos)") },
+                label = { Text("Senha de Coação (Desbloqueia e oculta bancos)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
@@ -371,14 +438,14 @@ fun SensitiveAppsSettingsSheet(
                 Text("Salvar Senhas")
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             Divider(color = MaterialTheme.colorScheme.surfaceVariant)
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "Aplicativos que Somem na Coação:",
+                text = "Bancos Protegidos:",
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
+                fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
@@ -387,7 +454,7 @@ fun SensitiveAppsSettingsSheet(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 300.dp)
+                    .heightIn(max = 240.dp)
             ) {
                 items(viewModel.allApps, key = { it.packageName }) { app ->
                     val bitmap = remember(app.packageName) { app.icon?.toComposeBitmap() }
@@ -403,13 +470,13 @@ fun SensitiveAppsSettingsSheet(
                                 bitmap = bitmap,
                                 contentDescription = null,
                                 modifier = Modifier
-                                    .size(38.dp)
+                                    .size(36.dp)
                                     .clip(CircleShape)
                             )
                         } else {
                             Box(
                                 modifier = Modifier
-                                    .size(38.dp)
+                                    .size(36.dp)
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.surfaceVariant),
                                 contentAlignment = Alignment.Center
@@ -424,7 +491,7 @@ fun SensitiveAppsSettingsSheet(
                             Text(
                                 text = app.label,
                                 fontWeight = FontWeight.Medium,
-                                fontSize = 14.sp,
+                                fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
